@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>7979</title>
+<meta name="description" content="여기엔 아무것도 없습니다. 날씨는 있습니다.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🫥%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #eef1f4;
+    --ink: #1c2530;
+    --soft: #8793a1;
+    --pop: #6b8cff;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16202b; --ink: #e8edf2; --soft: #7d8b9a; --pop: #9db0ff; }
+  }
+
+  /* 날씨마다 배경색이 살짝 바뀝니다 */
+  body[data-w="snow"]   { --bg: #dde6ef; }
+  body[data-w="rain"]   { --bg: #d6dde6; }
+  body[data-w="petals"] { --bg: #f6ebef; }
+  body[data-w="leaves"] { --bg: #f3ebdd; }
+  @media (prefers-color-scheme: dark) {
+    body[data-w="snow"]   { --bg: #1b2836; }
+    body[data-w="rain"]   { --bg: #121b26; }
+    body[data-w="petals"] { --bg: #261d24; }
+    body[data-w="leaves"] { --bg: #241d16; }
+  }
+  body[data-w="fireflies"] { --bg: #0f1824; --ink: #e8edf2; --soft: #7d8b9a; --pop: #9db0ff; }
+
+  *, *::before, *::after { box-sizing: inherit; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    padding: 24px;
+    overflow: hidden;
+    transition: background-color 1s ease, color 1s ease;
+  }
+  canvas#fx { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  main { position: relative; z-index: 1; display: grid; gap: 28px; justify-items: center; }
+
+  .num {
+    margin: 0;
+    font-size: clamp(88px, 28vw, 300px);
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    line-height: 0.9;
+    user-select: none;
+    -webkit-user-select: none;
+    white-space: nowrap;
+  }
+  .d { display: inline-block; transition: transform 0.18s ease-out; cursor: default; }
+  .g { display: inline-block; }
+  body.gone .d { pointer-events: none; }
+
+  .g.hop  { animation: hop 0.5s ease-out; }
+  .g.spin { animation: spin 0.7s cubic-bezier(.3,1.3,.5,1); }
+  .g.fall { animation: fall 1.2s ease-in forwards; animation-delay: calc(var(--i) * 0.12s); }
+  .g.in   { animation: in 0.9s cubic-bezier(.3,1.4,.5,1) both; animation-delay: calc(var(--i) * 0.12s); }
+
+  @keyframes hop {
+    0%   { transform: translateY(0); }
+    35%  { transform: translateY(-0.22em) rotate(-6deg); }
+    70%  { transform: translateY(0.02em) rotate(2deg); }
+    100% { transform: translateY(0); }
+  }
+  @keyframes spin {
+    0%   { transform: rotate(0) scale(1); }
+    50%  { transform: rotate(200deg) scale(1.12); }
+    100% { transform: rotate(360deg) scale(1); }
+  }
+  @keyframes fall { to { transform: translateY(120vh) rotate(var(--r, 40deg)); } }
+  @keyframes in {
+    from { transform: translateY(-120vh) rotate(-30deg); }
+    to   { transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body { transition: none; }
+    .d { transition: none; }
+    .g.hop, .g.spin, .g.in { animation: none; }
+    .g.fall { animation: none; opacity: 0; }
+  }
+
+  .line {
+    margin: 0;
+    min-height: 3.2em;
+    font-size: clamp(16px, 4.2vw, 20px);
+    line-height: 1.6;
+    max-width: 22em;
+  }
+
+  button {
+    font: inherit;
+    font-size: 15px;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1.5px solid var(--ink);
+    border-radius: 999px;
+    padding: 10px 22px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, transform 0.1s;
+  }
+  button:hover { background: var(--ink); color: var(--bg); }
+  button:active { transform: scale(0.94); }
+  button:focus-visible { outline: 3px solid var(--pop); outline-offset: 3px; }
+
+  .wx {
+    position: fixed;
+    z-index: 2;
+    top: calc(14px + env(safe-area-inset-top, 0px));
+    right: 14px;
+    width: 42px; height: 42px;
+    padding: 0;
+    font-size: 19px;
+    line-height: 1;
+    border-color: var(--soft);
+    background: transparent;
+  }
+  .wx:hover { background: transparent; color: inherit; border-color: var(--ink); }
+
+  .foot {
+    position: fixed;
+    z-index: 1;
+    left: 0; right: 0;
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    margin: 0;
+    font-size: 13px;
+    color: var(--soft);
+  }
+</style>
+</head>
+<body>
+<canvas id="fx" aria-hidden="true"></canvas>
+<button class="wx" id="wx" type="button" aria-label="날씨 바꾸기" title="날씨 바꾸기">🍂</button>
+<main>
+  <h1 class="num" id="num" aria-label="7979">
+    <span class="d" aria-hidden="true"><span class="g">7</span></span><span class="d" aria-hidden="true"><span class="g">9</span></span><span class="d" aria-hidden="true"><span class="g">7</span></span><span class="d" aria-hidden="true"><span class="g">9</span></span>
+  </h1>
+  <p class="line" id="line" aria-live="polite">여기엔 아무것도 없습니다.</p>
+  <button id="btn" type="button">누르지 마세요</button>
+</main>
+<p class="foot" id="foot"></p>
+
+<script>
+(function () {
+  var lines = [
+    "여기엔 아무것도 없습니다.",
+    "진짜로 없습니다.",
+    "눌러도 없습니다. 날씨는 있습니다.",
+    "숫자들이 놀랐습니다.",
+    "칠구칠구… 친구친구… 아무튼 없습니다.",
+    "계속 누르시는군요.",
+    "구칠구칠로 바꿔 봤습니다. 아무도 모릅니다.",
+    "…원래대로 돌려놨습니다.",
+    "심심하세요?",
+    "저도 심심합니다.",
+    "사실 주인장도 뭘 만들지 아직 모릅니다.",
+    "곧 뭔가 생길지도 모릅니다. 안 생길 수도 있습니다.",
+    "아직도 누르세요?",
+    "이 버튼, 사실 아무 기능이 없습니다.",
+    "…라고 말하면 더 누르실 것 같아서 말해봅니다.",
+    "그만 누르세요. 날씨가 거세집니다.",
+    "7979가 조금 불안해하고 있습니다.",
+    "마지막 경고입니다.",
+    "진짜 마지막입니다.",
+    "…한 번만 더 누르면 큰일 납니다."
+  ];
+  var LIMIT = lines.length;
+  var quips = {
+    "7": ["저는 7입니다.", "7은 행운의 숫자라고 합니다. 저는 잘 모르겠습니다.", "7입니다. 9랑 사이좋게 지냅니다."],
+    "9": ["저는 9입니다. 6 아닙니다.", "거꾸로 하면 6이라 가끔 곤란합니다.", "9입니다. 7이 시끄럽습니다."]
+  };
+
+  var RM = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var body = document.body;
+  var digits = Array.prototype.slice.call(document.querySelectorAll(".d"));
+  var glyphs = Array.prototype.slice.call(document.querySelectorAll(".g"));
+  var line = document.getElementById("line");
+  var btn = document.getElementById("btn");
+  var wxBtn = document.getElementById("wx");
+  var foot = document.getElementById("foot");
+
+  var count = 0, gone = false, touchedOnce = false;
+  var centers = [];
+  var idleTimer = null;
+  var baseTitle = "7979";
+
+  function say(t) { line.textContent = t; }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+  /* =====================  날씨 파티클  ===================== */
+  var cv = document.getElementById("fx");
+  var cx = cv.getContext("2d");
+  var W = 0, H = 0, dpr = 1;
+  var parts = [], ripples = [];
+  var wx = "leaves", wmode = "auto";
+  var gust = 0, intensity = 1, tick = 0;
+
+  var order = ["auto", "snow", "rain", "petals", "leaves", "fireflies", "off"];
+  var emoji = { snow: "❄️", rain: "🌧️", petals: "🌸", leaves: "🍂", fireflies: "✨", off: "🫥" };
+  var wname = { snow: "눈", rain: "비", petals: "벚꽃", leaves: "낙엽", fireflies: "반딧불", off: "맑음" };
+  var wmsg = {
+    snow: "눈이 옵니다. 쌓이진 않습니다.",
+    rain: "비가 옵니다. 우산은 없습니다.",
+    petals: "벚꽃이 날립니다. 봄이 아닐 수도 있습니다.",
+    leaves: "낙엽이 떨어집니다. 가을이거나 그런 척입니다.",
+    fireflies: "밤이 됐습니다. 반딧불이 나왔습니다.",
+    off: "다 치웠습니다. 다시 아무것도 없습니다."
+  };
+  var petalCols = ["#f4b6c8", "#f9cfd9", "#eea2b8", "#fbdde5"];
+  var leafCols = ["#d98324", "#e0a030", "#c26a2b", "#c98a3a", "#a8541f", "#e3b04a"];
+
+  try {
+    var sv = localStorage.getItem("w7979");
+    if (order.indexOf(sv) > -1) wmode = sv;
+  } catch (e) {}
+
+  function season() {
+    var m = new Date().getMonth();
+    if (m >= 2 && m <= 4) return "petals";
+    if (m >= 5 && m <= 7) return "rain";
+    if (m >= 8 && m <= 10) return "leaves";
+    return "snow";
+  }
+  function effective() { return wmode === "auto" ? season() : wmode; }
+
+  function sizeCanvas() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cv.style.width = W + "px"; cv.style.height = H + "px";
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function targetCount() {
+    var area = W * H, n;
+    if (wx === "snow") n = clamp(Math.round(area / 9000), 40, 150);
+    else if (wx === "rain") n = clamp(Math.round(area / 12000), 40, 130);
+    else if (wx === "petals") n = clamp(Math.round(area / 22000), 18, 70);
+    else if (wx === "leaves") n = clamp(Math.round(area / 26000), 16, 60);
+    else if (wx === "fireflies") n = clamp(Math.round(area / 30000), 14, 50);
+    else n = 0;
+    return Math.round(n * intensity);
+  }
+
+  function make(t, init) {
+    var p = { x: Math.random() * W, y: init ? Math.random() * H : -20 - Math.random() * 60, ph: Math.random() * 6.28 };
+    if (t === "snow") {
+      p.s = 1.3 + Math.random() * 3.2; p.vy = 0.35 + p.s * 0.2;
+      p.amp = 0.3 + Math.random() * 0.7; p.sp = 0.008 + Math.random() * 0.012;
+    } else if (t === "rain") {
+      p.len = 10 + Math.random() * 16; p.vy = 13 + Math.random() * 8;
+      p.gy = H * (0.84 + Math.random() * 0.15);
+      if (!init) p.y = -30 - Math.random() * H * 0.3;
+    } else if (t === "petals") {
+      p.s = 4 + Math.random() * 4; p.vy = 0.6 + Math.random() * 0.7;
+      p.amp = 0.7 + Math.random() * 0.9; p.sp = 0.01 + Math.random() * 0.015;
+      p.rot = Math.random() * 6.28; p.vr = (Math.random() - 0.5) * 0.04; p.fs = 0.02 + Math.random() * 0.03;
+      p.c = petalCols[Math.floor(Math.random() * petalCols.length)];
+    } else if (t === "leaves") {
+      p.s = 7 + Math.random() * 6; p.vy = 0.8 + Math.random() * 0.8;
+      p.amp = 1 + Math.random(); p.sp = 0.008 + Math.random() * 0.012;
+      p.rot = Math.random() * 6.28; p.vr = (Math.random() - 0.5) * 0.05; p.fs = 0.02 + Math.random() * 0.03;
+      p.c = leafCols[Math.floor(Math.random() * leafCols.length)];
+    } else if (t === "fireflies") {
+      p.y = Math.random() * H; p.s = 1.4 + Math.random() * 1.6;
+      p.a = Math.random() * 6.28; p.sp = 0.02 + Math.random() * 0.03;
+    }
+    return p;
+  }
+
+  function syncCount() {
+    var n = targetCount();
+    while (parts.length < n) parts.push(make(wx, false));
+    while (parts.length > n) parts.pop();
+  }
+
+  function applyWeather(announce) {
+    wx = effective();
+    if (wx === "off") body.removeAttribute("data-w"); else body.setAttribute("data-w", wx);
+    wxBtn.textContent = emoji[wx];
+    wxBtn.setAttribute("aria-label", "날씨 바꾸기 (지금: " + wname[wx] + ")");
+    parts = []; ripples = [];
+    if (!RM && wx !== "off") {
+      var n = targetCount();
+      for (var i = 0; i < n; i++) parts.push(make(wx, true));
+    }
+    if (announce) {
+      say(wmode === "auto" ? "계절에 맞춰 골랐습니다. " + wmsg[wx] : wmsg[wx]);
+    }
+  }
+
+  function drawLeaf(p) {
+    cx.save();
+    cx.translate(p.x, p.y);
+    cx.rotate(p.rot);
+    cx.scale(1, 0.25 + Math.abs(Math.cos(p.ph * 1.3)) * 0.75);
+    cx.fillStyle = p.c;
+    cx.beginPath();
+    cx.moveTo(-p.s, 0);
+    cx.quadraticCurveTo(0, -p.s * 0.75, p.s, 0);
+    cx.quadraticCurveTo(0, p.s * 0.75, -p.s, 0);
+    cx.fill();
+    cx.strokeStyle = "rgba(60,30,10,0.22)";
+    cx.lineWidth = 0.8;
+    cx.beginPath(); cx.moveTo(-p.s, 0); cx.lineTo(p.s, 0); cx.stroke();
+    cx.restore();
+  }
+
+  function frame() {
+    requestAnimationFrame(frame);
+    cx.clearRect(0, 0, W, H);
+    if (RM || wx === "off" || !parts.length) return;
+    tick += 1;
+    gust *= 0.95;
+    var i, p, n = parts.length;
+
+    if (wx === "rain") {
+      cx.strokeStyle = "rgba(115,145,190,0.5)"; cx.lineWidth = 1.2; cx.lineCap = "round";
+      cx.beginPath();
+      for (i = 0; i < n; i++) {
+        p = parts[i];
+        var vx = -2.2 + gust * 0.8;
+        var dxl = vx * (p.len / p.vy);
+        cx.moveTo(p.x - dxl, p.y - p.len); cx.lineTo(p.x, p.y);
+        p.x += vx; p.y += p.vy;
+        if (p.y > p.gy) {
+          if (ripples.length < 36) ripples.push({ x: p.x, y: p.gy, r: 1 });
+          parts[i] = make("rain", false);
+        } else if (p.x < -20) p.x = W + 20; else if (p.x > W + 20) p.x = -20;
+      }
+      cx.stroke();
+      cx.lineWidth = 1;
+      for (i = ripples.length - 1; i >= 0; i--) {
+        var rp = ripples[i];
+        rp.r += 0.45;
+        if (rp.r > 14) { ripples.splice(i, 1); continue; }
+        cx.strokeStyle = "rgba(115,145,190," + (0.4 * (1 - rp.r / 14)).toFixed(3) + ")";
+        cx.beginPath(); cx.ellipse(rp.x, rp.y, rp.r, rp.r * 0.35, 0, 0, 6.2832); cx.stroke();
+      }
+    } else if (wx === "snow") {
+      for (i = 0; i < n; i++) {
+        p = parts[i];
+        p.ph += p.sp;
+        p.x += Math.sin(p.ph) * p.amp + gust * (0.5 + p.s * 0.15);
+        p.y += p.vy;
+        cx.fillStyle = "rgba(255,255,255," + (0.5 + p.s / 9).toFixed(2) + ")";
+        cx.beginPath(); cx.arc(p.x, p.y, p.s, 0, 6.2832); cx.fill();
+        cx.strokeStyle = "rgba(130,155,190,0.25)"; cx.lineWidth = 0.6; cx.stroke();
+        if (p.y > H + 10) parts[i] = make("snow", false);
+        else if (p.x < -20) p.x = W + 20; else if (p.x > W + 20) p.x = -20;
+      }
+    } else if (wx === "petals") {
+      for (i = 0; i < n; i++) {
+        p = parts[i];
+        p.ph += p.sp;
+        p.x += Math.sin(p.ph) * p.amp + 0.25 + gust * 1.2;
+        p.y += p.vy; p.rot += p.vr;
+        cx.fillStyle = p.c;
+        cx.beginPath();
+        cx.ellipse(p.x, p.y, p.s, p.s * (0.25 + Math.abs(Math.cos(tick * p.fs + p.ph)) * 0.45), p.rot, 0, 6.2832);
+        cx.fill();
+        if (p.y > H + 20) parts[i] = make("petals", false);
+        else if (p.x < -30) p.x = W + 30; else if (p.x > W + 30) p.x = -30;
+      }
+    } else if (wx === "leaves") {
+      for (i = 0; i < n; i++) {
+        p = parts[i];
+        p.ph += p.sp;
+        p.x += Math.sin(p.ph) * p.amp + gust * 1.2;
+        p.y += p.vy; p.rot += p.vr;
+        drawLeaf(p);
+        if (p.y > H + 30) parts[i] = make("leaves", false);
+        else if (p.x < -40) p.x = W + 40; else if (p.x > W + 40) p.x = -40;
+      }
+    } else if (wx === "fireflies") {
+      for (i = 0; i < n; i++) {
+        p = parts[i];
+        p.a += (Math.random() - 0.5) * 0.18;
+        p.x += Math.cos(p.a) * 0.45 + gust * 0.3;
+        p.y += Math.sin(p.a) * 0.45;
+        if (p.x < -10) p.x = W + 10; else if (p.x > W + 10) p.x = -10;
+        if (p.y < -10) p.y = H + 10; else if (p.y > H + 10) p.y = -10;
+        var glow = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(tick * p.sp + p.ph));
+        var gr = cx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.s * 7);
+        gr.addColorStop(0, "rgba(225,255,150," + (0.85 * glow).toFixed(2) + ")");
+        gr.addColorStop(1, "rgba(225,255,150,0)");
+        cx.fillStyle = gr;
+        cx.beginPath(); cx.arc(p.x, p.y, p.s * 7, 0, 6.2832); cx.fill();
+      }
+    }
+  }
+
+  /* 날씨 바꾸기 버튼 */
+  wxBtn.addEventListener("click", function () {
+    resetIdle();
+    wmode = order[(order.indexOf(wmode) + 1) % order.length];
+    try { localStorage.setItem("w7979", wmode); } catch (e) {}
+    applyWeather(true);
+  });
+
+  /* 마우스를 휘두르면 바람이 붑니다 */
+  window.addEventListener("pointermove", function (e) {
+    gust = clamp(gust + clamp((e.movementX || 0) * 0.015, -0.6, 0.6), -5, 5);
+  });
+
+  /* =====================  7979 숫자  ===================== */
+  glyphs.forEach(function (g, i) {
+    g.style.setProperty("--i", i);
+    g.style.setProperty("--r", ((i % 2 ? 1 : -1) * (25 + Math.random() * 50)).toFixed(0) + "deg");
+    g.addEventListener("animationend", function (e) {
+      if (e.animationName === "hop") g.classList.remove("hop");
+      else if (e.animationName === "spin") g.classList.remove("spin");
+      else if (e.animationName === "in") g.classList.remove("in");
+    });
+  });
+
+  function play(g, cls) { g.classList.remove(cls); void g.offsetWidth; g.classList.add(cls); }
+  function setSwap(on) {
+    var txt = on ? "9797" : "7979";
+    glyphs.forEach(function (g, i) { g.textContent = txt.charAt(i); });
+  }
+
+  var visits = 1;
+  try {
+    visits = (parseInt(localStorage.getItem("v7979"), 10) || 0) + 1;
+    localStorage.setItem("v7979", String(visits));
+  } catch (e) {}
+  foot.textContent = visits === 1
+    ? "첫 방문을 환영합니다. 볼 건 없습니다."
+    : "이 빈 사이트에 " + visits + "번째로 오셨습니다.";
+
+  function measure() {
+    var saved = digits.map(function (d) { return d.style.transform; });
+    digits.forEach(function (d) { d.style.transform = "none"; });
+    centers = digits.map(function (d) {
+      var r = d.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    });
+    digits.forEach(function (d, i) { d.style.transform = saved[i]; });
+  }
+  function resetTilt() { digits.forEach(function (d) { d.style.transform = ""; }); }
+
+  window.addEventListener("pointermove", function (e) {
+    if (RM || gone || !centers.length) return;
+    digits.forEach(function (d, i) {
+      var dx = e.clientX - centers[i].x, dy = e.clientY - centers[i].y;
+      var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      var s = Math.max(0, 1 - dist / 520);
+      d.style.transform = "translate(" + (dx / dist * 14 * s).toFixed(1) + "px," +
+        (dy / dist * 14 * s).toFixed(1) + "px) rotate(" + (dx / dist * 7 * s).toFixed(1) + "deg)";
+    });
+  });
+  document.documentElement.addEventListener("mouseleave", resetTilt);
+  window.addEventListener("pointerup", function (e) {
+    if (e.pointerType && e.pointerType !== "mouse") resetTilt();
+  });
+
+  digits.forEach(function (d, i) {
+    var g = glyphs[i];
+    d.addEventListener("pointerenter", function (e) {
+      if (gone || RM || e.pointerType !== "mouse") return;
+      if (!g.classList.contains("hop") && !g.classList.contains("spin")) play(g, "hop");
+      if (!touchedOnce && count === 0) { touchedOnce = true; say("만지지 마세요. 간지럽습니다."); }
+    });
+    d.addEventListener("click", function () {
+      if (gone) return;
+      resetIdle();
+      if (!RM) play(g, "spin");
+      var set = quips[g.textContent] || quips["7"];
+      say(set[Math.floor(Math.random() * set.length)]);
+    });
+  });
+
+  function resetIdle() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(function () {
+      if (!gone) say("아직 계세요? 여전히 아무것도 없는데요. 날씨만 있습니다.");
+    }, 30000);
+  }
+
+  btn.addEventListener("click", function () {
+    resetIdle();
+
+    if (gone) {
+      gone = false; count = 0; touchedOnce = true;
+      body.classList.remove("gone");
+      setSwap(false);
+      intensity = 1; syncCount();
+      glyphs.forEach(function (g) { g.classList.remove("fall"); if (!RM) play(g, "in"); });
+      say("다시 채웠습니다. 날씨도 가라앉았습니다.");
+      btn.textContent = "누르지 마세요";
+      setTimeout(measure, 1400);
+      return;
+    }
+
+    count += 1;
+    gust = clamp(gust + (Math.random() < 0.5 ? -1 : 1) * 3.5, -5, 5);   // 한 줄기 돌풍
+
+    if (count >= LIMIT) {
+      gone = true;
+      body.classList.add("gone");
+      resetTilt();
+      intensity = 2.3; syncCount(); gust = (Math.random() < 0.5 ? -1 : 1) * 5;
+      glyphs.forEach(function (g) { g.classList.remove("hop", "spin", "in"); g.classList.add("fall"); });
+      say("7979가 떨어졌습니다. 날씨만 남았습니다.");
+      btn.textContent = "다시 채우기";
+      return;
+    }
+
+    intensity = 1 + (count / LIMIT) * 1.2;
+    syncCount();
+    if (!RM) glyphs.forEach(function (g, i) { setTimeout(function () { play(g, "hop"); }, i * 90); });
+    if (count === 6) setSwap(true);
+    else if (count === 7) setSwap(false);
+    say(lines[count]);
+    if (count === 1) btn.textContent = "그래도 누르지 마세요";
+  });
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      document.title = "어디 가세요?";
+    } else {
+      document.title = "돌아오셨네요";
+      setTimeout(function () { document.title = baseTitle; }, 1800);
+    }
+  });
+
+  var resizeT = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(resizeT);
+    resizeT = setTimeout(function () { sizeCanvas(); measure(); syncCount(); }, 150);
+  });
+
+  var ready = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+  ready.then(function () {
+    sizeCanvas();
+    applyWeather(false);
+    measure();
+    if (!RM) glyphs.forEach(function (g) { g.classList.add("in"); });
+    setTimeout(measure, 1400);
+    requestAnimationFrame(frame);
+    resetIdle();
+  });
+})();
+</script>
+</body>
+</html>
